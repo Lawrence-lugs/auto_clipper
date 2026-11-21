@@ -11,3 +11,10 @@ data/
 # Tooling artifacts
 .hier/
 .quarto/
+
+# Quarto output (built by the Pages workflow)
+docs/*.html
+docs/*_files/
+
+/.quarto/
+**/*.quarto_ipynb

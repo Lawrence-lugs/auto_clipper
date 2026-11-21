@@ -334,7 +334,7 @@ higher mean (79/min) than the smoothed line suggests there (~54/min).
    shaded chart.
 
 The full algorithm, parameter table, related work, and limitations are in
-[the segmentation note](segmentation.md).
+[the segmentation note](segmentation.html).
 
 ## Caveats
 

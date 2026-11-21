@@ -43,11 +43,14 @@ Render the Quarto report through the profile's ephemeral container:
 
 ```powershell
 . $PROFILE
+quarto render docs/index.qmd
 quarto render docs/chat_rate.qmd
+quarto render docs/segmentation.md
 ```
 
-The report uses Plotly from a CDN, so the committed HTML stays small; the
-local `docs/chat_rate_files/` assets are committed alongside it.
+The report uses Plotly from a CDN. Rendered HTML and `docs/*_files/` assets are
+git-ignored; `.github/workflows/pages.yml` renders and deploys `docs/` to GitHub
+Pages on pushes that touch docs or outputs.
 
 Outputs are written to `out/`, including `segments.csv`, `segments.json`, and
 `segments.png`. Raw downloads go to `data/` and are ignored by git. `fetch`
@@ -95,8 +98,10 @@ src/autoclipper/plot.py       chart rendering
 src/autoclipper/cli.py        argparse commands and CSV/JSON writers
 tests/test_rate.py            unit tests; no network access
 tests/test_segments.py        synthetic segmentation tests; no network access
-docs/chat_rate.qmd            Quarto report (rendered HTML + local assets committed)
+docs/chat_rate.qmd            Quarto report source
 docs/segmentation.md          algorithm, related work, limitations
+docs/index.qmd                Pages landing page
+.github/workflows/pages.yml   render + deploy docs on push
 out/                          committed chart + series + segments + summary
 ```
 
@@ -109,8 +114,9 @@ out/                          committed chart + series + segments + summary
 - Keep the chart readable at 1600×750: dark background, raw signal visible,
   smoothed line dominant, at most three annotated peaks.
 - The Quarto report should use Plotly, not the matplotlib PNGs. Keep
-  `embed-resources: false` and `include_plotlyjs="cdn"` so the HTML stays small;
-  commit `docs/chat_rate_files/` with it.
+  `embed-resources: false` and `include_plotlyjs="cdn"` so the HTML stays small.
+  Never commit the generated HTML or `docs/*_files/`; the Pages workflow builds
+  them.
 - Preserve UTF-8 when writing CSV/JSON; Japanese messages and titles are expected.
 - Generated artifacts in `out/` are committed so the README renders on GitHub.
 
@@ -120,8 +126,8 @@ out/                          committed chart + series + segments + summary
 2. `python -m autoclipper analyze LJgPVaZbTgI` succeeds from cache.
 3. `out/chat_rate.png` and `out/segments.png` open and annotations are not clipped.
 4. `out/summary.json` numbers match the README table and the segment table.
-5. `quarto render docs/chat_rate.qmd` succeeds if the report changed; open the
-   HTML and confirm both Plotly charts render and the tables appear.
+5. Run the three render commands above if docs changed; the Pages workflow does
+   the deployed render.
 6. `git status --short` shows no `data/` files.
 
 ## Guardrails

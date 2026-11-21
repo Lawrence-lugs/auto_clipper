@@ -1,0 +1,19 @@
+---
+title: "auto_clipper"
+subtitle: "Chat-speed analytics for YouTube live replays"
+format:
+  html:
+    theme: cosmo
+    toc: false
+---
+
+Reconstruct chat speed over a YouTube live stream from its public live-chat
+replay, then rank the stretches where chat reacts fastest. Source:
+[Lawrence-lugs/auto_clipper](https://github.com/Lawrence-lugs/auto_clipper).
+
+## Documents
+
+- [Chat rate report](chat_rate.html) — the full experiment on a real stream,
+  with interactive Plotly charts and the current top segments.
+- [Segmentation algorithm](segmentation.html) — threshold design, related work,
+  parameter reference, results, and known failure modes.
