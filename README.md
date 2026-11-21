@@ -109,16 +109,21 @@ Useful options:
 ## Documents
 
 - [`docs/chat_rate.html`](docs/chat_rate.html) - rendered Quarto report with
-  the chart, summary, and segment table (source: `docs/chat_rate.qmd`).
+  interactive Plotly charts, summary, and segment table (source:
+  `docs/chat_rate.qmd`).
 - [`docs/segmentation.md`](docs/segmentation.md) - segmentation algorithm,
   parameter table, related work, results, and limitations.
 
-Render the report through the repository's ephemeral Quarto container:
+Render the report through the repository's ephemeral Quarto container (it
+includes Plotly):
 
 ```powershell
 . $PROFILE
 quarto render docs/chat_rate.qmd
 ```
+
+For a local Python environment, install the docs extra with
+`pip install -e ".[dev,docs]"`.
 
 A Dev Container is included for a clean environment:
 

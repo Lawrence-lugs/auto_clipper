@@ -15,6 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+docs = ["plotly>=5"]
 
 [project.scripts]
 autoclipper = "autoclipper.cli:main"

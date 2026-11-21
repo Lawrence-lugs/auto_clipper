@@ -19,8 +19,10 @@ task explicitly asks.
 - Python 3.11+ (developed on 3.14, Windows; CI container uses 3.13).
 - Runtime deps: `numpy`, `matplotlib`.
 - Dev dep: `pytest`.
+- Docs dep: `plotly` (the Quarto container already includes it).
 - External: `yt-dlp` on `PATH` for downloading chat replays and metadata.
-- Charts use the `Agg` backend and must work headless.
+- Charts use the `Agg` backend and must work headless. The Quarto report uses
+  interactive Plotly figures loaded from the CDN.
 - Windows PowerShell is the primary shell. Use `$env:PYTHONPATH="src"` when the
   package is not installed. Set `$env:PYTHONIOENCODING="utf-8"` before printing
   Japanese text, or the console codepage will raise `UnicodeEncodeError`.
@@ -43,6 +45,9 @@ Render the Quarto report through the profile's ephemeral container:
 . $PROFILE
 quarto render docs/chat_rate.qmd
 ```
+
+The report uses Plotly from a CDN, so the committed HTML stays small; the
+local `docs/chat_rate_files/` assets are committed alongside it.
 
 Outputs are written to `out/`, including `segments.csv`, `segments.json`, and
 `segments.png`. Raw downloads go to `data/` and are ignored by git. `fetch`
@@ -90,7 +95,7 @@ src/autoclipper/plot.py       chart rendering
 src/autoclipper/cli.py        argparse commands and CSV/JSON writers
 tests/test_rate.py            unit tests; no network access
 tests/test_segments.py        synthetic segmentation tests; no network access
-docs/chat_rate.qmd            Quarto report (rendered HTML is committed)
+docs/chat_rate.qmd            Quarto report (rendered HTML + local assets committed)
 docs/segmentation.md          algorithm, related work, limitations
 out/                          committed chart + series + segments + summary
 ```
@@ -103,6 +108,9 @@ out/                          committed chart + series + segments + summary
 - Tests must not hit the network. Build synthetic JSONL fixtures in `tmp_path`.
 - Keep the chart readable at 1600×750: dark background, raw signal visible,
   smoothed line dominant, at most three annotated peaks.
+- The Quarto report should use Plotly, not the matplotlib PNGs. Keep
+  `embed-resources: false` and `include_plotlyjs="cdn"` so the HTML stays small;
+  commit `docs/chat_rate_files/` with it.
 - Preserve UTF-8 when writing CSV/JSON; Japanese messages and titles are expected.
 - Generated artifacts in `out/` are committed so the README renders on GitHub.
 
@@ -112,7 +120,8 @@ out/                          committed chart + series + segments + summary
 2. `python -m autoclipper analyze LJgPVaZbTgI` succeeds from cache.
 3. `out/chat_rate.png` and `out/segments.png` open and annotations are not clipped.
 4. `out/summary.json` numbers match the README table and the segment table.
-5. `quarto render docs/chat_rate.qmd` succeeds if the report changed.
+5. `quarto render docs/chat_rate.qmd` succeeds if the report changed; open the
+   HTML and confirm both Plotly charts render and the tables appear.
 6. `git status --short` shows no `data/` files.
 
 ## Guardrails

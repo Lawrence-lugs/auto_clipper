@@ -5,7 +5,7 @@ date: "2026-11-21"
 format:
   html:
     theme: cosmo
-    embed-resources: true
+    embed-resources: false
     toc: true
     toc-depth: 2
     code-fold: true
@@ -20,10 +20,9 @@ execute:
 
 This is the chat rate of
 [`LJgPVaZbTgI`](https://youtu.be/LJgPVaZbTgI) (八雲べに, 14 November 2026),
-reconstructed from the public live-chat replay. Grey is the raw 10-second
-signal; blue is a 90-second Gaussian smoothing.
-
-![Chat messages per minute over the full stream](../out/chat_rate.png){width=100%}
+reconstructed from the public live-chat replay. Hover the chart for the exact
+time and rate. Grey is the raw 10-second signal; blue is a 90-second Gaussian
+smoothing.
 
 ```{python}
 #| label: overview
@@ -40,6 +39,14 @@ out_dir = next(
 summary = json.loads((out_dir / "summary.json").read_text(encoding="utf-8"))
 segments_payload = json.loads((out_dir / "segments.json").read_text(encoding="utf-8"))
 
+
+def hms(seconds: float) -> str:
+    total = max(0, int(round(seconds)))
+    hours, remainder = divmod(total, 3600)
+    minutes, secs = divmod(remainder, 60)
+    return f"{hours}:{minutes:02d}:{secs:02d}" if hours else f"{minutes}:{secs:02d}"
+
+
 display(Markdown(f"""
 **{summary['video']['title']}**
 
@@ -51,6 +58,119 @@ display(Markdown(f"""
 """))
 ```
 
+```{python}
+#| label: fig-chat-rate
+#| fig-cap: "Chat messages per minute over the full stream"
+import plotly.graph_objects as go
+import plotly.io as pio
+
+from IPython.display import HTML
+
+series = pd.read_csv(out_dir / "chat_rate.csv")
+minutes = series["offset_s"] / 60
+duration_min = float(minutes.iloc[-1])
+tickvals = list(range(0, int(duration_min) + 1, 30))
+
+
+def show_figure(fig):
+    display(
+        HTML(
+            pio.to_html(
+                fig,
+                include_plotlyjs="cdn",
+                full_html=False,
+                config={"displayModeBar": False, "responsive": True},
+            )
+        )
+    )
+
+
+def add_time_annotation(fig, x, y, text):
+    position = x / max(duration_min, 1e-9)
+    xanchor = "left" if position < 0.08 else "right" if position > 0.92 else "center"
+    fig.add_annotation(
+        x=x,
+        y=y,
+        text=text,
+        showarrow=True,
+        arrowhead=2,
+        ax=0,
+        ay=-32,
+        xanchor=xanchor,
+        bgcolor="rgba(255,255,255,0.92)",
+        bordercolor="#f78166",
+        font=dict(color="#b45309", size=11),
+    )
+
+
+fig = go.Figure()
+fig.add_trace(
+    go.Scatter(
+        x=minutes,
+        y=series["raw_per_min"],
+        mode="lines",
+        name="raw (10 s)",
+        line=dict(width=0.6, color="rgba(107,114,128,0.35)"),
+        customdata=series[["offset_hms"]],
+        hovertemplate="%{customdata[0]} · raw %{y:.0f}/min<extra></extra>",
+    )
+)
+fig.add_trace(
+    go.Scatter(
+        x=minutes,
+        y=series["smoothed_per_min"],
+        mode="lines",
+        name="smoothed (90 s)",
+        line=dict(width=2.5, color="#2563eb"),
+        fill="tozeroy",
+        fillcolor="rgba(37,99,235,0.08)",
+        customdata=series[["offset_hms"]],
+        hovertemplate="%{customdata[0]} · smoothed %{y:.1f}/min<extra></extra>",
+    )
+)
+for moment in summary["top_moments"][:3]:
+    x = moment["offset_s"] / 60
+    y = moment["smoothed_per_min"]
+    fig.add_trace(
+        go.Scatter(
+            x=[x],
+            y=[y],
+            mode="markers",
+            marker=dict(color="#f78166", size=8, line=dict(width=1, color="white")),
+            showlegend=False,
+            hoverinfo="skip",
+        )
+    )
+    add_time_annotation(fig, x, y, f"#{moment['rank']} {moment['time']} · {y:.0f}/min")
+
+raw_cap = float(series["raw_per_min"].quantile(0.995))
+y_max = max(float(series["smoothed_per_min"].max()) * 1.2, raw_cap * 1.05)
+fig.update_layout(
+    template="plotly_white",
+    height=500,
+    margin=dict(l=64, r=28, t=78, b=54),
+    hovermode="x unified",
+    title=dict(
+        text=f"Chat messages per minute · {summary['video']['id']}",
+        font=dict(size=17),
+        x=0.01,
+    ),
+    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+)
+fig.update_xaxes(
+    title_text="video time",
+    tickvals=tickvals,
+    ticktext=[hms(value * 60) for value in tickvals],
+    gridcolor="#e5e7eb",
+)
+fig.update_yaxes(
+    title_text="messages per minute",
+    range=[0, y_max],
+    gridcolor="#e5e7eb",
+)
+show_figure(fig)
+```
+
 ## Fastest chat segments
 
 The segmentation baseline finds stretches above a robust threshold, merges
@@ -59,13 +179,6 @@ stream baseline. The five strongest are:
 
 ```{python}
 #| label: tbl-segments
-def hms(seconds: float) -> str:
-    total = max(0, int(round(seconds)))
-    hours, remainder = divmod(total, 3600)
-    minutes, secs = divmod(remainder, 60)
-    return f"{hours}:{minutes:02d}:{secs:02d}" if hours else f"{minutes}:{secs:02d}"
-
-
 segments = pd.DataFrame(segments_payload["segments"])
 table = pd.DataFrame(
     {
@@ -84,7 +197,121 @@ table = pd.DataFrame(
 table.set_index("Rank")
 ```
 
-![Top segments shaded on the smoothed rate](../out/segments.png){width=100%}
+```{python}
+#| label: fig-segments
+#| fig-cap: "Top chat segments shaded on the smoothed rate"
+segments_fig = go.Figure()
+segments_fig.add_trace(
+    go.Scatter(
+        x=minutes,
+        y=series["smoothed_per_min"],
+        mode="lines",
+        name="smoothed (90 s)",
+        line=dict(width=2.4, color="#2563eb"),
+        customdata=series[["offset_hms"]],
+        hovertemplate="%{customdata[0]} · %{y:.1f}/min<extra></extra>",
+    )
+)
+
+for row in segments.itertuples():
+    start_min, end_min = row.start_s / 60, row.end_s / 60
+    segments_fig.add_vrect(
+        x0=start_min,
+        x1=end_min,
+        fillcolor="rgba(247,129,102,0.13)",
+        line_width=1,
+        line_color="rgba(247,129,102,0.55)",
+        layer="below",
+    )
+    segments_fig.add_trace(
+        go.Scatter(
+            x=[start_min, end_min],
+            y=[row.mean_per_min, row.mean_per_min],
+            mode="lines",
+            line=dict(color="#f78166", width=2),
+            showlegend=False,
+            hoverinfo="skip",
+        )
+    )
+    segments_fig.add_trace(
+        go.Scatter(
+            x=[(start_min + end_min) / 2],
+            y=[row.mean_per_min],
+            mode="markers",
+            marker=dict(color="#f78166", size=10, line=dict(width=1, color="white")),
+            showlegend=False,
+            customdata=[[
+                f"{hms(row.start_s)} – {hms(row.end_s)}",
+                f"{row.duration_s / 60:.1f} min",
+                f"{row.messages:,} messages",
+                f"score +{row.score:.1f}/min",
+            ]],
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>"
+                "%{customdata[1]} · %{customdata[2]}<br>"
+                "%{customdata[3]}<extra></extra>"
+            ),
+        )
+    )
+    segments_fig.add_annotation(
+        x=(start_min + end_min) / 2,
+        y=row.mean_per_min,
+        yshift=14,
+        text=f"#{row.rank} {row.mean_per_min:.0f}/min",
+        showarrow=False,
+        bgcolor="rgba(255,255,255,0.92)",
+        bordercolor="#f78166",
+        font=dict(color="#b45309", size=10),
+    )
+
+threshold = segments_payload["threshold_per_min"]
+baseline = segments_payload["baseline_per_min"]
+segments_fig.add_hline(
+    y=threshold,
+    line_dash="dash",
+    line_color="#f97316",
+    annotation_text=f"threshold {threshold:.1f}/min",
+    annotation_position="top right",
+    annotation_font_color="#c2410c",
+)
+segments_fig.add_hline(
+    y=baseline,
+    line_dash="dot",
+    line_color="#9ca3af",
+    annotation_text=f"baseline {baseline:.1f}/min",
+    annotation_position="bottom left",
+    annotation_font_color="#6b7280",
+)
+segment_y_max = max(
+    float(segments["mean_per_min"].max()),
+    float(series["smoothed_per_min"].max()),
+    threshold,
+) * 1.18
+segments_fig.update_layout(
+    template="plotly_white",
+    height=500,
+    margin=dict(l=64, r=28, t=78, b=54),
+    hovermode="x unified",
+    showlegend=False,
+    title=dict(
+        text=f"Top {len(segments)} chat bursts · {summary['video']['id']}",
+        font=dict(size=17),
+        x=0.01,
+    ),
+)
+segments_fig.update_xaxes(
+    title_text="video time",
+    tickvals=tickvals,
+    ticktext=[hms(value * 60) for value in tickvals],
+    gridcolor="#e5e7eb",
+)
+segments_fig.update_yaxes(
+    title_text="messages per minute",
+    range=[0, segment_y_max],
+    gridcolor="#e5e7eb",
+)
+show_figure(segments_fig)
+```
 
 ::: {.callout-note}
 **Score** is the segment's mean messages/minute minus the stream's median rate.
