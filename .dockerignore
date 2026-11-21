@@ -1,0 +1,8 @@
+.git
+.hier
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+data
+out

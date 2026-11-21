@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+
+# Raw chat replays and metadata (downloaded, potentially large/user content)
+data/
+
+# Tooling artifacts
+.hier/

@@ -1,0 +1,64 @@
+{
+  "video": {
+    "id": "LJgPVaZbTgI",
+    "title": "#04【JUDGE EYES:死神の遺言】完全初見！コーフンするじゃねえか・・・【ぶいすぽ/八雲べに】※ネタバレあり",
+    "channel": "八雲べに",
+    "duration_s": 17399.0,
+    "upload_date": "20261114",
+    "was_live": true,
+    "url": "https://www.youtube.com/watch?v=LJgPVaZbTgI"
+  },
+  "chat_items": 8153,
+  "chat_items_analyzed": 8104,
+  "chat_items_by_kind": {
+    "liveChatTextMessageRenderer": 8100,
+    "liveChatPaidStickerRenderer": 1,
+    "liveChatPaidMessageRenderer": 3
+  },
+  "duplicates_skipped": 0,
+  "preroll_messages_excluded": 49,
+  "preroll_wallclock_span_s": 2064.1,
+  "duration_s": 17399.0,
+  "duration_hms": "4:49:59",
+  "mean_per_min": 27.95,
+  "median_smoothed_per_min": 26.76,
+  "bin_s": 10.0,
+  "sigma_s": 90.0,
+  "top_moments": [
+    {
+      "rank": 1,
+      "offset_s": 4885.0,
+      "time": "1:21:25",
+      "smoothed_per_min": 60.34,
+      "messages_within_5min": 374
+    },
+    {
+      "rank": 2,
+      "offset_s": 8415.0,
+      "time": "2:20:15",
+      "smoothed_per_min": 57.64,
+      "messages_within_5min": 482
+    },
+    {
+      "rank": 3,
+      "offset_s": 17335.0,
+      "time": "4:48:55",
+      "smoothed_per_min": 54.49,
+      "messages_within_5min": 281
+    },
+    {
+      "rank": 4,
+      "offset_s": 12845.0,
+      "time": "3:34:05",
+      "smoothed_per_min": 53.76,
+      "messages_within_5min": 367
+    },
+    {
+      "rank": 5,
+      "offset_s": 105.0,
+      "time": "1:45",
+      "smoothed_per_min": 48.47,
+      "messages_within_5min": 301
+    }
+  ]
+}
