@@ -32,6 +32,28 @@ The spot checks are informal: I read the messages in a ±20 s window around each
 peak. They are enough to show the peaks are real content reactions, not just
 noise from the replay parser.
 
+## Fastest chat segments
+
+A first segmentation baseline turns the smoothed curve into ranked candidate
+ranges: contiguous stretches above a robust threshold, with short gaps merged
+and blips removed. Intensity is scored as mean messages/min above the stream
+median, so a long quiet stretch cannot win on length alone.
+
+| # | Range | Length | Mean rate | Score | What it looks like |
+|---|-------|--------|-----------|-------|--------------------|
+| 1 | 4:47:20-4:50:00 | 2.7 min | 79.1/min | +52.4 | end-of-stream goodbyes |
+| 2 | 3:32:00-3:37:30 | 5.5 min | 54.2/min | +27.4 | a QTE / "ガキィ！" moment |
+| 3 | 1:19:20-1:24:00 | 4.7 min | 53.6/min | +26.8 | the "ひなーの派" agreement wave |
+| 4 | 2:44:40-2:48:00 | 3.3 min | 53.4/min | +26.6 | story reactions |
+| 5 | 0:12:30-0:14:40 | 2.2 min | 52.6/min | +25.9 | an early gameplay reaction |
+
+![Top chat segments shaded on the smoothed rate](out/segments.png)
+
+The end-of-stream burst ranks first, which is correct for raw chat speed but
+wrong for clip selection. The algorithm is documented, with the related-work
+review and known failure modes, in
+[`docs/segmentation.md`](docs/segmentation.md).
+
 ## Method
 
 1. **Fetch** — `yt-dlp --write-subs --sub-langs live_chat --sub-format json`
@@ -46,7 +68,8 @@ noise from the replay parser.
 4. **Bin and smooth** — count messages in 10 s bins, convert to messages/min,
    then convolve with a Gaussian kernel (σ = 90 s). Zero padding outside the
    stream keeps the ends from growing fake plateaus; the curve tapers there.
-5. **Export** — PNG chart, full 10 s series, peak table, and a JSON summary.
+5. **Export** — PNG chart, full 10 s series, peak table, ranked segments, and
+   a JSON summary.
 
 Why smoothing at all? A live chat is a point process: per-second counts are
 almost all zeros with occasional spikes. Binning to 10 s makes the spikes
@@ -79,6 +102,22 @@ Useful options:
 --min-separation-s 600  minimum distance between reported peaks
 --top 5                 number of peaks to keep
 --keep-preroll          do not drop waiting-room messages at t=0
+--threshold 40          absolute segment threshold in msg/min
+--top-segments 5        number of ranked segments to emit
+```
+
+## Documents
+
+- [`docs/chat_rate.html`](docs/chat_rate.html) - rendered Quarto report with
+  the chart, summary, and segment table (source: `docs/chat_rate.qmd`).
+- [`docs/segmentation.md`](docs/segmentation.md) - segmentation algorithm,
+  parameter table, related work, results, and limitations.
+
+Render the report through the repository's ephemeral Quarto container:
+
+```powershell
+. $PROFILE
+quarto render docs/chat_rate.qmd
 ```
 
 A Dev Container is included for a clean environment:
@@ -95,7 +134,10 @@ A Dev Container is included for a clean environment:
 | `out/chat_rate.png` | chart shown above |
 | `out/chat_rate.csv` | 10 s bins: raw count, raw/min, smoothed/min |
 | `out/peaks.csv` | top peaks with messages in a ±5 min window |
-| `out/summary.json` | video metadata, counts, rates, peak moments |
+| `out/segments.csv` | ranked segment ranges, rates, messages, scores |
+| `out/segments.json` | segments plus threshold, baseline, candidate count |
+| `out/segments.png` | top segments shaded on the smoothed rate |
+| `out/summary.json` | video metadata, counts, rates, peaks, segments |
 
 Raw replays land in `data/` and are git-ignored (13 MB for this stream).
 
@@ -109,7 +151,11 @@ Raw replays land in `data/` and are git-ignored (13 MB for this stream).
   detected heuristically (near-zero offset plus a wall-clock span ≥ 60 s); it
   can be disabled with `--keep-preroll`.
 - **Edge tapering.** Zero padding means the first and last minutes are smoothed
-  with less context. Treat boundary values as lower bounds.
+  with less context. Treat boundary values as lower bounds; segment means use
+  raw counts, so an end-of-stream segment can score above the smoothed curve.
+- **Segments are chat energy, not clip quality.** Greetings and goodbyes can
+  outrank content reactions. Exclude stream boundaries or add content features
+  before using segments as clip candidates.
 - **Counts ≠ people.** One excited viewer can post many messages, and bots or
   spam are included. Use unique authors for an audience-size proxy.
 - This is a research tool. Respect YouTube's Terms of Service and do not hammer
@@ -122,6 +168,8 @@ The experiment proves the data source; the analytics can now be built on top:
 - burst detection from chat alone (repeated tokens, emoji walls, superchats);
 - correlate chat spikes with audio loudness or scene cuts to find highlight
   moments for clipping;
+- compare the threshold baseline with Kleinberg/HMM burst detection and label a
+  few clips to measure precision;
 - unique chatters, message length, and emote distributions per window;
 - compare many streams to learn channel-specific baselines;
 - serve the series to a web dashboard instead of a static PNG.
@@ -132,9 +180,11 @@ The experiment proves the data source; the analytics can now be built on top:
 src/autoclipper/
   live_chat.py   fetch + parse live-chat JSONL, waiting-room split
   rate.py        10 s bins, Gaussian smoothing, peak picking
-  plot.py        dark-theme matplotlib chart
+  segments.py    threshold segmentation, duration bounds, ranking
+  plot.py        dark-theme matplotlib charts
   cli.py         `fetch` / `analyze` commands
-tests/           parser, binning, smoothing and peak tests
+tests/           parser, binning, smoothing, segmentation tests
+docs/            Quarto report + segmentation note
 out/             committed example outputs
 data/            raw downloads (git-ignored)
 ```

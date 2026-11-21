@@ -10,3 +10,5 @@ data/
 
 # Tooling artifacts
 .hier/
+.quarto/
+docs/*_files/

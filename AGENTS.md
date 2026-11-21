@@ -4,13 +4,15 @@ Instructions for agents working in this repository.
 
 ## What this project is
 
-`auto_clipper` currently contains one finished experiment: reconstructing a
-YouTube live chat's message rate over the video timeline from the `live_chat`
-replay, then smoothing the spike train into a readable curve.
+`auto_clipper` reconstructs a YouTube live chat's message rate over the video
+timeline from the `live_chat` replay, smooths the spike train, and now includes
+a first segmentation baseline that ranks the stretches of fastest chat.
 
-The experiment is done. The code is intentionally small and is meant to be the
-foundation for chat-based analytics and, eventually, highlight/clip detection.
-Do not add a web app, database, or scraper unless the task explicitly asks.
+The chat-rate experiment is done. The segmentation layer is a reviewed
+baseline, not a finished highlight detector. The code is intentionally small
+and is meant to be the foundation for chat-based analytics and, eventually,
+highlight/clip detection. Do not add a web app, database, or scraper unless the
+task explicitly asks.
 
 ## Environment
 
@@ -31,12 +33,20 @@ Do not add a web app, database, or scraper unless the task explicitly asks.
 $env:PYTHONPATH="src"
 python -m autoclipper fetch   https://youtu.be/LJgPVaZbTgI
 python -m autoclipper analyze https://youtu.be/LJgPVaZbTgI
+python -m autoclipper analyze https://youtu.be/LJgPVaZbTgI --threshold 50 --top-segments 10
 python -m pytest -q
 ```
 
-Outputs are written to `out/`. Raw downloads go to `data/` and are ignored by
-git. `fetch` caches by video id; `analyze` reuses the cache unless
-`--force-fetch` is passed.
+Render the Quarto report through the profile's ephemeral container:
+
+```powershell
+. $PROFILE
+quarto render docs/chat_rate.qmd
+```
+
+Outputs are written to `out/`, including `segments.csv`, `segments.json`, and
+`segments.png`. Raw downloads go to `data/` and are ignored by git. `fetch`
+caches by video id; `analyze` reuses the cache unless `--force-fetch` is passed.
 
 ## Data model and invariants
 
@@ -59,16 +69,30 @@ git. `fetch` caches by video id; `analyze` reuses the cache unless
   update the README numbers if the committed chart changes.
 - **Peaks:** greedy top-N selection with a minimum separation (default 600 s).
   Do not report adjacent bins as separate moments.
+- **Segmentation:** entry threshold defaults to
+  `median + 1.25 * 1.4826 * MAD` of the smoothed rate (≈40/min here); exit is
+  `0.8 * threshold`. Merge gaps ≤ 60 s, drop runs < 120 s, split runs > 900 s
+  at the quietest point in the allowed window. Score is mean raw
+  messages/min above the median baseline. Keep these defaults in the CLI and
+  document any change in `docs/segmentation.md`.
+- **Segment stats:** `mean_per_min` uses raw counts, not the smoothed curve.
+  `peak_per_min` is the busiest 60-second window from raw counts. The smoothed
+  curve tapers at stream edges, so a boundary segment can have a mean above the
+  curve there; this is expected.
 
 ## Layout
 
 ```text
 src/autoclipper/live_chat.py  metadata fetch, JSONL parse, pre-roll split
 src/autoclipper/rate.py       binning, Gaussian smoothing, peak picking, time format
+src/autoclipper/segments.py   threshold segmentation, duration bounds, ranking
 src/autoclipper/plot.py       chart rendering
 src/autoclipper/cli.py        argparse commands and CSV/JSON writers
 tests/test_rate.py            unit tests; no network access
-out/                          committed chart + series + summary
+tests/test_segments.py        synthetic segmentation tests; no network access
+docs/chat_rate.qmd            Quarto report (rendered HTML is committed)
+docs/segmentation.md          algorithm, related work, limitations
+out/                          committed chart + series + segments + summary
 ```
 
 ## Conventions
@@ -86,9 +110,10 @@ out/                          committed chart + series + summary
 
 1. `python -m pytest -q` passes.
 2. `python -m autoclipper analyze LJgPVaZbTgI` succeeds from cache.
-3. `out/chat_rate.png` opens and annotations are not clipped.
-4. `out/summary.json` numbers match the README table.
-5. `git status --short` shows no `data/` files.
+3. `out/chat_rate.png` and `out/segments.png` open and annotations are not clipped.
+4. `out/summary.json` numbers match the README table and the segment table.
+5. `quarto render docs/chat_rate.qmd` succeeds if the report changed.
+6. `git status --short` shows no `data/` files.
 
 ## Guardrails
 

@@ -1,0 +1,68 @@
+{
+  "threshold_per_min": 39.991,
+  "low_threshold_per_min": 31.993,
+  "baseline_per_min": 26.761,
+  "candidates": 10,
+  "segments": [
+    {
+      "rank": 1,
+      "start_s": 17240.0,
+      "end_s": 17400.0,
+      "peak_s": 17370.0,
+      "duration_s": 160.0,
+      "messages": 211,
+      "mean_per_min": 79.125,
+      "peak_per_min": 124.0,
+      "baseline_per_min": 26.761151884178844,
+      "score": 52.363848115821156
+    },
+    {
+      "rank": 2,
+      "start_s": 12720.0,
+      "end_s": 13050.0,
+      "peak_s": 12860.0,
+      "duration_s": 330.0,
+      "messages": 298,
+      "mean_per_min": 54.18181818181818,
+      "peak_per_min": 81.0,
+      "baseline_per_min": 26.761151884178844,
+      "score": 27.420666297639336
+    },
+    {
+      "rank": 3,
+      "start_s": 4760.0,
+      "end_s": 5040.0,
+      "peak_s": 4880.0,
+      "duration_s": 280.0,
+      "messages": 250,
+      "mean_per_min": 53.57142857142857,
+      "peak_per_min": 144.0,
+      "baseline_per_min": 26.761151884178844,
+      "score": 26.810276687249726
+    },
+    {
+      "rank": 4,
+      "start_s": 9880.0,
+      "end_s": 10080.0,
+      "peak_s": 9910.0,
+      "duration_s": 200.0,
+      "messages": 178,
+      "mean_per_min": 53.4,
+      "peak_per_min": 88.0,
+      "baseline_per_min": 26.761151884178844,
+      "score": 26.638848115821155
+    },
+    {
+      "rank": 5,
+      "start_s": 750.0,
+      "end_s": 880.0,
+      "peak_s": 780.0,
+      "duration_s": 130.0,
+      "messages": 114,
+      "mean_per_min": 52.61538461538461,
+      "peak_per_min": 75.0,
+      "baseline_per_min": 26.761151884178844,
+      "score": 25.85423273120577
+    }
+  ]
+}

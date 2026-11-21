@@ -18,8 +18,9 @@ from .live_chat import (
     split_preroll,
     video_id_from_url,
 )
-from .plot import plot_rate
+from .plot import plot_rate, plot_segments
 from .rate import RateSeries, bin_events, format_hms, top_peaks
+from .segments import Segmentation, segment_rate
 
 
 def _normalise_source(source: str) -> str:
@@ -109,6 +110,45 @@ def _write_peaks_csv(
                     format_hms(center),
                     f"{series.smooth_per_min[index]:.3f}",
                     _window_count(events, center, 300.0),
+                ]
+            )
+
+
+def _write_segments_csv(path: Path, segmentation: Segmentation) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(
+            [
+                "rank",
+                "start_s",
+                "start_hms",
+                "end_s",
+                "end_hms",
+                "duration_s",
+                "peak_s",
+                "peak_hms",
+                "messages",
+                "mean_per_min",
+                "peak_per_min",
+                "score_over_baseline",
+            ]
+        )
+        for segment in segmentation.segments:
+            writer.writerow(
+                [
+                    segment.rank,
+                    f"{segment.start_s:.1f}",
+                    format_hms(segment.start_s),
+                    f"{segment.end_s:.1f}",
+                    format_hms(segment.end_s),
+                    f"{segment.duration_s:.1f}",
+                    f"{segment.peak_s:.1f}",
+                    format_hms(segment.peak_s),
+                    segment.messages,
+                    f"{segment.mean_per_min:.3f}",
+                    f"{segment.peak_per_min:.3f}",
+                    f"{segment.score:.3f}",
                 ]
             )
 
@@ -214,11 +254,23 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         min_separation_s=args.min_separation_s,
         limit=args.top,
     )
+    segmentation = segment_rate(
+        series,
+        threshold_per_min=args.threshold,
+        low_factor=args.low_factor,
+        merge_gap_s=args.merge_gap_s,
+        min_duration_s=args.min_segment_s,
+        max_duration_s=args.max_segment_s,
+        top_n=args.top_segments,
+    )
 
     out_dir: Path = args.out_dir
     chart_path = out_dir / "chat_rate.png"
+    segments_chart_path = out_dir / "segments.png"
     series_path = out_dir / "chat_rate.csv"
     peaks_path = out_dir / "peaks.csv"
+    segments_path = out_dir / "segments.csv"
+    segments_json_path = out_dir / "segments.json"
     summary_path = out_dir / "summary.json"
 
     plot_rate(
@@ -228,11 +280,28 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         peak_indices=peak_indices,
         preroll_count=len(preroll),
     )
+    plot_segments(series, segmentation, info, segments_chart_path)
     _write_series_csv(series_path, series)
     _write_peaks_csv(peaks_path, events, series, peak_indices)
+    _write_segments_csv(segments_path, segmentation)
+    segments_payload = {
+        "threshold_per_min": round(segmentation.threshold_per_min, 3),
+        "low_threshold_per_min": round(segmentation.low_threshold_per_min, 3),
+        "baseline_per_min": round(segmentation.baseline_per_min, 3),
+        "candidates": segmentation.candidates,
+        "segments": [asdict(segment) for segment in segmentation.segments],
+    }
+    segments_json_path.write_text(
+        json.dumps(segments_payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
     summary = _summary(
         info, events, series, peak_indices, chat.duplicates_skipped, preroll
     )
+    summary["segmentation"] = {
+        key: value for key, value in segments_payload.items() if key != "segments"
+    }
+    summary["top_segments"] = segments_payload["segments"]
     summary_path.write_text(
         json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -251,7 +320,22 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         f"median (smoothed) {summary['median_smoothed_per_min']:.1f}/min"
     )
     print(f"peak     {top['time']} · {top['smoothed_per_min']:.0f} msg/min")
-    print(f"wrote    {chart_path}, {series_path}, {peaks_path}, {summary_path}")
+    print(
+        f"segments {segmentation.candidates} candidates · threshold "
+        f"{segmentation.threshold_per_min:.1f}/min · baseline "
+        f"{segmentation.baseline_per_min:.1f}/min"
+    )
+    for segment in segmentation.segments:
+        print(
+            f"  #{segment.rank} {format_hms(segment.start_s)}–"
+            f"{format_hms(segment.end_s)} · {segment.duration_s / 60:.1f} min · "
+            f"{segment.mean_per_min:.1f}/min (+{segment.score:.1f}) · "
+            f"{segment.messages} msgs"
+        )
+    print(
+        f"wrote    {chart_path}, {series_path}, {peaks_path}, "
+        f"{segments_path}, {segments_json_path}, {segments_chart_path}, {summary_path}"
+    )
     return 0
 
 
@@ -301,6 +385,42 @@ def build_parser() -> argparse.ArgumentParser:
         "--keep-preroll",
         action="store_true",
         help="keep waiting-room messages collapsed onto t=0",
+    )
+    analyze_parser.add_argument(
+        "--threshold",
+        type=float,
+        default=None,
+        help="segment entry threshold in msg/min (default: median + 1.25*MAD-sigma)",
+    )
+    analyze_parser.add_argument(
+        "--low-factor",
+        type=float,
+        default=0.8,
+        help="leave a segment below threshold*low-factor (0.8)",
+    )
+    analyze_parser.add_argument(
+        "--merge-gap-s",
+        type=float,
+        default=60.0,
+        help="merge segments separated by at most this gap (60)",
+    )
+    analyze_parser.add_argument(
+        "--min-segment-s",
+        type=float,
+        default=120.0,
+        help="minimum segment duration in seconds (120)",
+    )
+    analyze_parser.add_argument(
+        "--max-segment-s",
+        type=float,
+        default=900.0,
+        help="maximum segment duration in seconds (900)",
+    )
+    analyze_parser.add_argument(
+        "--top-segments",
+        type=int,
+        default=5,
+        help="number of ranked segments to output (5)",
     )
     analyze_parser.set_defaults(func=cmd_analyze)
     return parser
